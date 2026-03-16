@@ -9,4 +9,5 @@ public interface ICustomerRepository
     Task<bool> UpdateByCpfAsync(string cpf, Customer customer, CancellationToken cancellationToken = default);
     Task<Customer?> GetByCpfAsync(string cpf, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<Customer>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<bool> ExistsByPhoneExcludingAsync(string ddd, string number, string cpf, CancellationToken cancellationToken = default);
 }

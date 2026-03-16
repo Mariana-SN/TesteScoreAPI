@@ -60,7 +60,13 @@ public sealed class CustomerService : ICustomerService
 
         await _customerRepository.AddAsync(customer, cancellationToken);
 
-        return ToResponse(customer);
+        var phoneAlreadyExists = await _customerRepository.ExistsByPhoneExcludingAsync(
+            customer.Phone.Ddd,
+            customer.Phone.Number,
+            customer.Cpf,
+            cancellationToken);
+
+        return ToResponse(customer, phoneAlreadyExists);
     }
 
     public async Task<CustomerResponse?> UpdateByCpfAsync(string cpf, UpdateCustomerRequest request, CancellationToken cancellationToken = default)
@@ -106,7 +112,13 @@ public sealed class CustomerService : ICustomerService
 
         await _customerRepository.UpdateByCpfAsync(normalizedCpf, updatedCustomer, cancellationToken);
 
-        return ToResponse(updatedCustomer);
+        var phoneAlreadyExists = await _customerRepository.ExistsByPhoneExcludingAsync(
+            updatedCustomer.Phone.Ddd,
+            updatedCustomer.Phone.Number,
+            updatedCustomer.Cpf,
+            cancellationToken);
+
+        return ToResponse(updatedCustomer, phoneAlreadyExists);
     }
 
     public async Task<CustomerResponse?> GetByCpfAsync(string cpf, CancellationToken cancellationToken = default)
@@ -120,18 +132,37 @@ public sealed class CustomerService : ICustomerService
 
         var customer = await _customerRepository.GetByCpfAsync(normalizedCpf, cancellationToken);
 
-        return customer is null ? null : ToResponse(customer);
+        if (customer is null) return null;
+
+        var phoneAlreadyExists = await _customerRepository.ExistsByPhoneExcludingAsync(
+            customer.Phone.Ddd,
+            customer.Phone.Number,
+            customer.Cpf,
+            cancellationToken);
+
+        return ToResponse(customer, phoneAlreadyExists);
     }
 
     public async Task<IReadOnlyCollection<CustomerResponse>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var customers = await _customerRepository.GetAllAsync(cancellationToken);
-        return customers.Select(ToResponse).ToArray();
+
+        var phoneCounts = customers
+            .GroupBy(c => (c.Phone.Ddd, c.Phone.Number))
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return customers
+            .Select(c => ToResponse(c, phoneCounts[(c.Phone.Ddd, c.Phone.Number)] > 1))
+            .ToArray();
     }
 
-    private CustomerResponse ToResponse(Customer customer)
+    private CustomerResponse ToResponse(Customer customer, bool phoneAlreadyExists)
     {
-        var score = _scoreCalculator.Calculate(customer, DateOnly.FromDateTime(DateTime.UtcNow));
+
+        var score = _scoreCalculator.Calculate(
+            customer,
+            DateOnly.FromDateTime(DateTime.UtcNow),
+            phoneAlreadyExists);
 
         return new CustomerResponse
         {

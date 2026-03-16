@@ -65,5 +65,12 @@ namespace Teste.ScoreAPI.Infrastructure.Repositories
             return true;
 
         }
+
+        public async Task<bool> ExistsByPhoneExcludingAsync(string ddd, string number, string cpf, CancellationToken cancellationToken = default)
+        {
+            return await _context.Customers
+                .AsNoTracking()
+                .AnyAsync(c => c.Phone.Ddd == ddd && c.Phone.Number == number && c.Cpf != cpf, cancellationToken);
+        }
     }
 }
